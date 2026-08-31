@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useProductStore } from "@/store/products";
@@ -28,6 +28,7 @@ type FormState = {
   swatchFrom: string;
   swatchTo: string;
   description: string;
+  image: string;
 };
 
 function emptyForm(): FormState {
@@ -50,6 +51,7 @@ function emptyForm(): FormState {
     swatchFrom: "#1a1a1a",
     swatchTo: "#3a3a3a",
     description: "",
+    image: "",
   };
 }
 
@@ -73,6 +75,7 @@ function productToForm(p: Product): FormState {
     swatchFrom: p.swatch[0],
     swatchTo: p.swatch[1],
     description: p.description,
+    image: p.image ?? "",
   };
 }
 
@@ -87,10 +90,14 @@ export function ProductFormPage() {
   const getProduct = useProductStore((s) => s.getProduct);
   const addProduct = useProductStore((s) => s.addProduct);
   const updateProduct = useProductStore((s) => s.updateProduct);
+  const uploadImage = useProductStore((s) => s.uploadImage);
 
   const existing = !isNew && id ? getProduct(id) : undefined;
   const [form, setForm] = useState<FormState>(existing ? productToForm(existing) : emptyForm());
   const [slugTouched, setSlugTouched] = useState(!isNew);
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     if (existing) setForm(productToForm(existing));
@@ -124,6 +131,22 @@ export function ProductFormPage() {
     }));
   }
 
+  async function onImageSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setSubmitError("");
+    try {
+      const url = await uploadImage(file);
+      set("image", url);
+    } catch {
+      setSubmitError("Image upload failed. Check Cloudinary credentials on the server.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   const canSubmit =
     form.title.trim() &&
     form.slug.trim() &&
@@ -134,9 +157,9 @@ export function ProductFormPage() {
     form.color.trim() &&
     form.description.trim();
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || submitting) return;
 
     const payload = {
       title: form.title.trim(),
@@ -156,14 +179,23 @@ export function ProductFormPage() {
       colorHex: form.colorHex,
       swatch: [form.swatchFrom, form.swatchTo] as [string, string],
       description: form.description.trim(),
+      image: form.image || undefined,
+      images: form.image ? [form.image] : [],
     };
 
-    if (isNew) {
-      addProduct(payload);
-    } else if (id) {
-      updateProduct(id, payload);
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      if (isNew) {
+        await addProduct(payload);
+      } else if (id) {
+        await updateProduct(id, payload);
+      }
+      navigate("/products");
+    } catch {
+      setSubmitError("Could not save this product. Please try again.");
+      setSubmitting(false);
     }
-    navigate("/products");
   }
 
   return (
@@ -442,11 +474,31 @@ export function ProductFormPage() {
           <div className="border border-white/10 bg-white/[0.03] p-5">
             <h2 className="mb-3 font-heading text-lg text-foreground">Preview</h2>
             <div
-              className="aspect-[4/5] w-full"
-              style={{
-                background: `linear-gradient(135deg, ${form.swatchFrom}, ${form.swatchTo})`,
-              }}
-            />
+              className="aspect-[4/5] w-full overflow-hidden bg-background-secondary"
+              style={
+                form.image
+                  ? undefined
+                  : { background: `linear-gradient(135deg, ${form.swatchFrom}, ${form.swatchTo})` }
+              }
+            >
+              {form.image && (
+                <img
+                  src={form.image}
+                  alt={form.title || "Product"}
+                  className="h-full w-full object-cover object-center"
+                />
+              )}
+            </div>
+            <label className="mt-3 block cursor-pointer border border-white/15 px-3 py-2 text-center text-xs text-muted hover:border-gold/40 hover:text-gold">
+              {uploading ? "Uploading…" : form.image ? "Replace Image" : "Upload Image"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={onImageSelected}
+              />
+            </label>
             <p className="mt-3 text-xs uppercase tracking-widest text-gold/80">
               {form.colorway || "Colorway"}
             </p>
@@ -456,12 +508,14 @@ export function ProductFormPage() {
             <p className="text-gold">{form.price ? `₹${form.price}` : "₹0"}</p>
           </div>
 
+          {submitError && <p className="text-sm text-red-400">{submitError}</p>}
+
           <button
             type="submit"
-            disabled={!canSubmit}
+            disabled={!canSubmit || submitting || uploading}
             className="w-full rounded-full bg-gold px-8 py-3 font-medium text-background transition-colors hover:bg-gold-accent disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {isNew ? "Add Product" : "Save Changes"}
+            {submitting ? "Saving…" : isNew ? "Add Product" : "Save Changes"}
           </button>
         </div>
       </form>

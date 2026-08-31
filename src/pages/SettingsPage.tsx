@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Truck, CheckCircle2, XCircle, KeyRound } from "lucide-react";
 import { useSettingsStore, type StoreSettings } from "@/store/settings";
 import { useAuthStore } from "@/store/auth";
@@ -15,8 +15,9 @@ function ChangePasswordCard() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setSuccess(false);
@@ -26,7 +27,9 @@ function ChangePasswordCard() {
       return;
     }
 
-    const result = changePassword(currentPassword, newPassword);
+    setSubmitting(true);
+    const result = await changePassword(currentPassword, newPassword);
+    setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -85,10 +88,10 @@ function ChangePasswordCard() {
         <div className="sm:col-span-2">
           <button
             type="submit"
-            disabled={!currentPassword || !newPassword || !confirmPassword}
+            disabled={submitting || !currentPassword || !newPassword || !confirmPassword}
             className="border border-gold/50 px-5 py-2.5 text-sm text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Update Password
+            {submitting ? "Updating…" : "Update Password"}
           </button>
         </div>
       </form>
@@ -103,8 +106,14 @@ export function SettingsPage() {
 
   const [draft, setDraft] = useState<StoreSettings>(settings);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [testResult, setTestResult] = useState<"idle" | "success" | "error">("idle");
   const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    setDraft(settings);
+  }, [settings]);
 
   function set<K extends keyof StoreSettings>(key: K, value: StoreSettings[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -117,12 +126,20 @@ export function SettingsPage() {
     setDraft((d) => ({ ...d, shiprocket: { ...d.shiprocket, [key]: value } }));
   }
 
-  function saveAll(e: FormEvent) {
+  async function saveAll(e: FormEvent) {
     e.preventDefault();
-    updateSettings(draft);
-    updateShiprocket(draft.shiprocket);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2500);
+    setSaving(true);
+    setSaveError("");
+    try {
+      await updateSettings(draft);
+      await updateShiprocket(draft.shiprocket);
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
+    } catch {
+      setSaveError("Could not save settings. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function testShiprocketConnection() {
@@ -246,6 +263,20 @@ export function SettingsPage() {
               />
               <p className="mt-1 text-xs text-muted">0 = always free</p>
             </div>
+            <div>
+              <label className={labelClass}>Shipping Fee (₹)</label>
+              <input
+                type="number"
+                min={0}
+                disabled={draft.freeShippingThreshold === 0}
+                value={draft.shippingFee}
+                onChange={(e) => set("shippingFee", Number(e.target.value))}
+                className={inputClass}
+              />
+              <p className="mt-1 text-xs text-muted">
+                Charged on orders below the free shipping threshold
+              </p>
+            </div>
           </div>
         </section>
 
@@ -269,6 +300,28 @@ export function SettingsPage() {
                 min={1}
                 value={draft.deliveryEtaMaxDays}
                 onChange={(e) => set("deliveryEtaMaxDays", Number(e.target.value))}
+                className={inputClass}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="border border-white/10 bg-white/[0.03] p-5 lg:col-span-2">
+          <h2 className="mb-4 font-heading text-lg text-foreground">Newsletter Signup</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>Heading</label>
+              <input
+                value={draft.newsletterHeading}
+                onChange={(e) => set("newsletterHeading", e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Subtext</label>
+              <input
+                value={draft.newsletterSubtext}
+                onChange={(e) => set("newsletterSubtext", e.target.value)}
                 className={inputClass}
               />
             </div>
@@ -369,11 +422,13 @@ export function SettingsPage() {
           <div className="flex items-center gap-4">
             <button
               type="submit"
-              className="rounded-full bg-gold px-8 py-3 font-medium text-background transition-colors hover:bg-gold-accent"
+              disabled={saving}
+              className="rounded-full bg-gold px-8 py-3 font-medium text-background transition-colors hover:bg-gold-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save Settings
+              {saving ? "Saving…" : "Save Settings"}
             </button>
             {saved && <span className="text-sm text-gold">Settings saved successfully.</span>}
+            {saveError && <span className="text-sm text-red-400">{saveError}</span>}
           </div>
         </div>
       </form>

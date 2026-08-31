@@ -6,6 +6,8 @@ import {
   Truck,
   Users,
   Settings,
+  Mail,
+  LayoutTemplate,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,5 +25,7 @@ export const NAV: NavItem[] = [
   { to: "/orders/board", label: "Order Board", Icon: KanbanSquare },
   { to: "/shipping", label: "Shiprocket", Icon: Truck },
   { to: "/customers", label: "Customers", Icon: Users },
+  { to: "/content", label: "Content", Icon: LayoutTemplate },
+  { to: "/messages", label: "Messages", Icon: Mail },
   { to: "/settings", label: "Settings", Icon: Settings },
 ];

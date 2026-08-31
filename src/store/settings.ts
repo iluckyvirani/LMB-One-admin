@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { api } from "@/lib/api";
 
 export type StoreSettings = {
   storeName: string;
@@ -12,8 +12,11 @@ export type StoreSettings = {
   codEnabled: boolean;
   codMaxAmount: number;
   freeShippingThreshold: number;
+  shippingFee: number;
   deliveryEtaMinDays: number;
   deliveryEtaMaxDays: number;
+  newsletterHeading: string;
+  newsletterSubtext: string;
   shiprocket: {
     enabled: boolean;
     email: string;
@@ -34,8 +37,11 @@ const DEFAULT_SETTINGS: StoreSettings = {
   codEnabled: true,
   codMaxAmount: 10000,
   freeShippingThreshold: 0,
+  shippingFee: 99,
   deliveryEtaMinDays: 3,
   deliveryEtaMaxDays: 7,
+  newsletterHeading: "Get 10% off your first order",
+  newsletterSubtext: "Sign up for drops, restocks and members-only offers.",
   shiprocket: {
     enabled: false,
     email: "",
@@ -47,23 +53,34 @@ const DEFAULT_SETTINGS: StoreSettings = {
 
 type SettingsState = {
   settings: StoreSettings;
-  updateSettings: (patch: Partial<StoreSettings>) => void;
-  updateShiprocket: (patch: Partial<StoreSettings["shiprocket"]>) => void;
+  loading: boolean;
+  fetchSettings: () => Promise<void>;
+  updateSettings: (patch: Partial<StoreSettings>) => Promise<void>;
+  updateShiprocket: (patch: Partial<StoreSettings["shiprocket"]>) => Promise<void>;
 };
 
-export const useSettingsStore = create<SettingsState>()(
-  persist(
-    (set, get) => ({
-      settings: DEFAULT_SETTINGS,
-      updateSettings: (patch) => set({ settings: { ...get().settings, ...patch } }),
-      updateShiprocket: (patch) =>
-        set({
-          settings: {
-            ...get().settings,
-            shiprocket: { ...get().settings.shiprocket, ...patch },
-          },
-        }),
-    }),
-    { name: "lmb-admin-settings" },
-  ),
-);
+export const useSettingsStore = create<SettingsState>()((set) => ({
+  settings: DEFAULT_SETTINGS,
+  loading: false,
+
+  fetchSettings: async () => {
+    set({ loading: true });
+    try {
+      const settings = await api.get<StoreSettings>("/admin/settings");
+      set({ settings, loading: false });
+    } catch (err) {
+      set({ loading: false });
+      throw err;
+    }
+  },
+
+  updateSettings: async (patch) => {
+    const settings = await api.put<StoreSettings>("/admin/settings", patch);
+    set({ settings });
+  },
+
+  updateShiprocket: async (patch) => {
+    const settings = await api.patch<StoreSettings>("/admin/settings/shiprocket", patch);
+    set({ settings });
+  },
+}));

@@ -1,10 +1,18 @@
-import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { X, ExternalLink } from "lucide-react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils";
 import { NAV } from "@/lib/nav";
+import { useAuthStore } from "@/store/auth";
+import { useProductStore } from "@/store/products";
+import { useOrderStore } from "@/store/orders";
+import { useCustomerStore } from "@/store/customers";
+import { useShipmentStore } from "@/store/shipments";
+import { useSettingsStore } from "@/store/settings";
+import { useMessagesStore } from "@/store/messages";
+import { useContentStore } from "@/store/content";
 
 function MobileSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
@@ -58,6 +66,42 @@ function MobileSidebar({ open, onClose }: { open: boolean; onClose: () => void }
 
 export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
+  const logout = useAuthStore((s) => s.logout);
+  const fetchProducts = useProductStore((s) => s.fetchProducts);
+  const fetchOrders = useOrderStore((s) => s.fetchOrders);
+  const fetchCustomers = useCustomerStore((s) => s.fetchCustomers);
+  const fetchShipments = useShipmentStore((s) => s.fetchShipments);
+  const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+  const fetchMessages = useMessagesStore((s) => s.fetchMessages);
+  const fetchContent = useContentStore((s) => s.fetchAll);
+
+  useEffect(() => {
+    fetchProducts().catch(console.error);
+    fetchOrders().catch(console.error);
+    fetchCustomers().catch(console.error);
+    fetchShipments().catch(console.error);
+    fetchSettings().catch(console.error);
+    fetchMessages().catch(console.error);
+    fetchContent().catch(console.error);
+  }, [
+    fetchProducts,
+    fetchOrders,
+    fetchCustomers,
+    fetchShipments,
+    fetchSettings,
+    fetchMessages,
+    fetchContent,
+  ]);
+
+  useEffect(() => {
+    function onUnauthorized() {
+      logout();
+      navigate("/login");
+    }
+    window.addEventListener("lmb:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("lmb:unauthorized", onUnauthorized);
+  }, [logout, navigate]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden">

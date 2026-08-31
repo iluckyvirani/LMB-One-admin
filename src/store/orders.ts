@@ -1,25 +1,34 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { Order, OrderStatus } from "@/lib/types";
-import { INITIAL_ORDERS } from "@/lib/mockData";
+import { api } from "@/lib/api";
 
 type OrderState = {
   orders: Order[];
-  updateStatus: (id: string, status: OrderStatus) => void;
+  loading: boolean;
+  fetchOrders: () => Promise<void>;
+  updateStatus: (id: string, status: OrderStatus) => Promise<void>;
   getOrder: (id: string) => Order | undefined;
 };
 
-export const useOrderStore = create<OrderState>()(
-  persist(
-    (set, get) => ({
-      orders: INITIAL_ORDERS,
-      updateStatus: (id, status) => {
-        set({
-          orders: get().orders.map((o) => (o.id === id ? { ...o, status } : o)),
-        });
-      },
-      getOrder: (id) => get().orders.find((o) => o.id === id),
-    }),
-    { name: "lmb-admin-orders" },
-  ),
-);
+export const useOrderStore = create<OrderState>()((set, get) => ({
+  orders: [],
+  loading: false,
+
+  fetchOrders: async () => {
+    set({ loading: true });
+    try {
+      const orders = await api.get<Order[]>("/admin/orders");
+      set({ orders, loading: false });
+    } catch (err) {
+      set({ loading: false });
+      throw err;
+    }
+  },
+
+  updateStatus: async (id, status) => {
+    const updated = await api.patch<Order>(`/admin/orders/${id}/status`, { status });
+    set({ orders: get().orders.map((o) => (o.id === id ? updated : o)) });
+  },
+
+  getOrder: (id) => get().orders.find((o) => o.id === id),
+}));

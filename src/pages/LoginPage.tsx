@@ -9,12 +9,15 @@ export function LoginPage() {
   const [email, setEmail] = useState(DEMO_CREDENTIALS.email);
   const [password, setPassword] = useState(DEMO_CREDENTIALS.password);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   if (isLoggedIn) return <Navigate to="/" replace />;
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
-    const result = login(email, password);
+    setSubmitting(true);
+    const result = await login(email, password);
+    setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -55,9 +58,10 @@ export function LoginPage() {
 
           <button
             type="submit"
-            className="w-full rounded-full bg-gold px-8 py-3 font-medium text-background transition-colors hover:bg-gold-accent"
+            disabled={submitting}
+            className="w-full rounded-full bg-gold px-8 py-3 font-medium text-background transition-colors hover:bg-gold-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Login
+            {submitting ? "Logging in…" : "Login"}
           </button>
         </form>
 

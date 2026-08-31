@@ -28,6 +28,8 @@ export function CustomerDetailPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
@@ -56,12 +58,24 @@ export function CustomerDetailPage() {
     );
   }
 
-  function saveDetails() {
+  async function saveDetails() {
     if (!customer) return;
-    updateCustomer(customer.id, { name: name.trim(), email: email.trim(), phone: phone.trim() });
-    setEditing(false);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2000);
+    setSaving(true);
+    setSaveError("");
+    try {
+      await updateCustomer(customer.id, {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+      });
+      setEditing(false);
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setSaveError("Could not save changes. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -101,6 +115,7 @@ export function CustomerDetailPage() {
               </button>
             </div>
             {saved && <p className="mb-3 text-sm text-gold">Details saved successfully.</p>}
+            {saveError && <p className="mb-3 text-sm text-red-400">{saveError}</p>}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelClass}>Name</label>
@@ -134,10 +149,11 @@ export function CustomerDetailPage() {
             {editing && (
               <button
                 type="button"
+                disabled={saving}
                 onClick={saveDetails}
-                className="mt-4 rounded-full bg-gold px-6 py-2.5 text-sm font-medium text-background hover:bg-gold-accent"
+                className="mt-4 rounded-full bg-gold px-6 py-2.5 text-sm font-medium text-background hover:bg-gold-accent disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Save Changes
+                {saving ? "Saving…" : "Save Changes"}
               </button>
             )}
           </section>
